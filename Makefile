@@ -29,48 +29,56 @@ PROMPT = A is taller than B, and C is shorter than B. Who is the tallest?
 # Cases
 # ----------------------------------------
 
-# Case A: ngl=0 + 手動オフロード（Attention層 GPU, FFN層 CPU, その他の層 CPU）
+# Case A: テンソル種別ベースのオフロード（Attention層 GPU, FFN層 CPU, その他の層 CPU）
 case-a:
 	$(DOCKER_RUN) "$(RUN_CMD) -ngl 0 \
 		--override-tensor 'blk\.[0-9]+\.ffn_.*=CPU' \
 		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
 
-# Case B: ハイブリッドオフロード（Attention層 GPU, FFN層 CPU, その他の層 GPU）
+# Case B: テンソル種別ベースのオフロード（Attention層 GPU, FFN層 CPU, その他の層 GPU）
 case-b:
 	$(DOCKER_RUN) "$(RUN_CMD) \
 		--override-tensor 'blk\.[0-9]+\.ffn_.*=CPU' \
 		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
 
-# Case C: 手動で VRAM 10.7GB 付近まで調整（Attention層 と 一部のFFN層 GPU,　余りのFFN層 CPU）
+# Case C: テンソル種別ベースのオフロード（Attention層 と 先頭から27層のFFN層 GPU, 余りのFFN層とpost_ffw層・post_attention層はすべてCPU）
 case-c:
+	$(DOCKER_RUN) "$(RUN_CMD) \
+		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-7])\.ffn_.*=CUDA0' \
+		--override-tensor 'blk\.(2[8-9]|[3-6][0-9])\.ffn_.*=CPU' \
+		--override-tensor 'blk\.[0-9]+\.(post_ffw_.*|post_attention_.*)=CPU' \
+		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
+
+# Case D: テンソル種別ベースのオフロード（Attention層 と 先頭から27層のFFN層とpost_ffw層・post_attention層はすべてGPU, 余りのFFN層はCPU）
+case-d:
+	$(DOCKER_RUN) "$(RUN_CMD) \
+		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-7])\.ffn_.*=CUDA0' \
+		--override-tensor 'blk\.(2[8-9]|[3-6][0-9])\.ffn_.*=CPU' \
+		--override-tensor 'blk\.[0-9]+\.(post_ffw_.*|post_attention_.*)=CUDA0' \
+		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
+
+# Case E: テンソル種別ベースのオフロード（Attention層 と 先頭から27層のFFN層、先頭から27層のPOST_FFW、先頭から27層のPOST_ATTENTION層 GPU, 余りのFFN、POST_FFW、POST_ATTENTION層 CPU）
+case-e:
 	$(DOCKER_RUN) "$(RUN_CMD) \
 		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-7])\.(ffn_.*|post_ffw_.*|post_attention_.*)=CUDA0' \
 		--override-tensor 'blk\.(2[8-9]|[3-6][0-9])\.(ffn_.*|post_ffw_.*|post_attention_.*)=CPU' \
 		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
 
-# Case D: 手動で VRAM 10.7GB 付近まで調整（Attention層 と 一部のFFN層 GPU,　余りのFFN層 CPU）
-case-d:
-	$(DOCKER_RUN) "$(RUN_CMD) \
-		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-7])\.(ffn_.*|post_ffw_.*)=CUDA0' \
-		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-7])\.post_attention_.*=CPU' \
-		--override-tensor 'blk\.(2[8-9]|[3-6][0-9])\.(ffn_.*|post_ffw_.*|post_attention_.*)=CPU' \
-		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
-
-# Case E: 手動で VRAM 10.7GB 付近まで調整（Attention層 と 一部のFFN層 GPU,　余りのFFN層 CPU）
-case-e:
+# Case F: テンソル種別ベースのオフロード（Attention層 と 先頭から28層のFFN層、先頭から28層のPOST_FFW、先頭から28層のPOST_ATTENTION層 GPU, 余りのFFN、POST_FFW、POST_ATTENTION層 CPU）
+case-f:
 	$(DOCKER_RUN) "$(RUN_CMD) \
 		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-8])\.(ffn_.*|post_ffw_.*|post_attention_.*)=CUDA0' \
 		--override-tensor 'blk\.(29|[3-6][0-9])\.(ffn_.*|post_ffw_.*|post_attention_.*)=CPU' \
 		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
-	
-# Case F: -ngl 34（層数ベース）
-case-f:
+
+# Case G: 層数ベースのオフロード
+case-g:
 	$(DOCKER_RUN) "$(RUN_CMD) -ngl 34"
 
 # ----------------------------------------
 # Benchmark Configuration
 # ----------------------------------------
-CASES ?= case-e case-f
+CASES ?= case-f case-g
 RUNS ?= 10
 BENCHMARK_LOG = benchmark.log
 
@@ -175,4 +183,4 @@ benchmark:
 # Utility
 # ----------------------------------------
 
-.PHONY: build download-model case-a case-b case-c case-d case-e case-f benchmark
+.PHONY: build download-model case-a case-b case-c case-d case-e case-f case-g benchmark
