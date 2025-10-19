@@ -4,6 +4,8 @@ SHELL := /bin/bash
 # Docker image & model path
 IMAGE = llm
 MODEL_PATH = /home/ubuntu/models
+MODEL_FILE = GLM-4-32B-0414-Q4_K_M.gguf
+MODEL_URL = https://huggingface.co/lmstudio-community/GLM-4-32B-0414-GGUF/resolve/main/$(MODEL_FILE)
 DOCKER_RUN = docker run --gpus all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --rm -v $(MODEL_PATH):/models $(IMAGE) bash -c
 
 # ----------------------------------------
@@ -14,8 +16,13 @@ DOCKER_RUN = docker run --gpus all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --r
 build:
 	docker build -t $(IMAGE) .
 
+# Download model
+download-model:
+	@mkdir -p $(MODEL_PATH)
+	wget $(MODEL_URL) -O $(MODEL_PATH)/$(MODEL_FILE)
+
 # 共通実行コマンド
-RUN_CMD = llama-cli -m /models/lmstudio-community_GLM-4-32B-0414-GGUF_GLM-4-32B-0414-Q4_K_M.gguf -p '$(PROMPT)' --temp 0.0 --mlock --no-mmap
+RUN_CMD = llama-cli -m /models/$(MODEL_FILE) -p '$(PROMPT)' --temp 0.0 --mlock --no-mmap
 PROMPT = A is taller than B, and C is shorter than B. Who is the tallest?
 
 # ----------------------------------------
@@ -168,4 +175,4 @@ benchmark:
 # Utility
 # ----------------------------------------
 
-.PHONY: build case-a case-b case-c case-d case-e case-f benchmark
+.PHONY: build download-model case-a case-b case-c case-d case-e case-f benchmark
