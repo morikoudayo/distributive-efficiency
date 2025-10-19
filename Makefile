@@ -4,8 +4,8 @@ SHELL := /bin/bash
 # Docker image & model path
 IMAGE = llm
 MODEL_PATH = $(HOME)/models
-MODEL_FILE = GLM-4-32B-0414-Q4_K_M.gguf
-MODEL_URL = https://huggingface.co/lmstudio-community/GLM-4-32B-0414-GGUF/resolve/main/$(MODEL_FILE)
+MODEL_FILE = GLM-4.5-Air-UD-Q3_K_XL-00001-of-00002.gguf
+MODEL_URL = https://huggingface.co/unsloth/GLM-4.5-Air-GGUF/resolve/main/Q3_K_M/GLM-4.5-Air-Q3_K_M-00001-of-00002.gguf
 DOCKER_RUN = docker run --gpus all --cap-add=IPC_LOCK --ulimit memlock=-1:-1 --rm -v $(MODEL_PATH):/models $(IMAGE) bash -c
 
 # ----------------------------------------
@@ -22,7 +22,7 @@ download-model:
 	wget $(MODEL_URL) -O $(MODEL_PATH)/$(MODEL_FILE)
 
 # 共通実行コマンド
-RUN_CMD = llama-cli -m /models/$(MODEL_FILE) -p '$(PROMPT)' --temp 0.0 --mlock --no-mmap
+RUN_CMD = llama-cli -m /models/$(MODEL_FILE) -p '$(PROMPT)' --temp 0.0 --mlock --no-mmap --ctx-size 512
 PROMPT = A is taller than B, and C is shorter than B. Who is the tallest?
 
 # ----------------------------------------
@@ -81,6 +81,12 @@ case-x:
 		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-8])\.ffn_.*=CUDA0' \
 		--override-tensor 'blk\.(29|[3-6][0-9])\.ffn_.*=CPU' \
 		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
+
+# Case Y: テンソル種別ベースのオフロード（Attention層 と 先頭から27層のFFN層とpost_ffw層・post_attention層はすべてGPU, 余りのFFN層はCPU）
+case-y:
+	$(DOCKER_RUN) "$(RUN_CMD) \
+		--override-tensor 'blk\.[7-9]\.ffn_.*=CPU' \
+		--override-tensor 'blk\.([1-6][0-9])\.ffn_.*=CPU'"
 
 # ----------------------------------------
 # Benchmark Configuration
@@ -190,4 +196,4 @@ benchmark:
 # Utility
 # ----------------------------------------
 
-.PHONY: build download-model case-a case-b case-c case-d case-e case-f case-g case-x benchmark
+.PHONY: build download-model case-a case-b case-c case-d case-e case-f case-g case-x case-y benchmark
