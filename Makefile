@@ -75,10 +75,17 @@ case-f:
 case-g:
 	$(DOCKER_RUN) "$(RUN_CMD) -ngl 34"
 
+# Case X: テンソル種別ベースのオフロード（Attention層 と 先頭から27層のFFN層とpost_ffw層・post_attention層はすべてGPU, 余りのFFN層はCPU）
+case-x:
+	$(DOCKER_RUN) "$(RUN_CMD) \
+		--override-tensor 'blk\.([0-9]|1[0-9]|2[0-8])\.ffn_.*=CUDA0' \
+		--override-tensor 'blk\.(29|[3-6][0-9])\.ffn_.*=CPU' \
+		--override-tensor 'blk\.[0-9]+\.attn_.*=CUDA0'"
+
 # ----------------------------------------
 # Benchmark Configuration
 # ----------------------------------------
-CASES ?= case-f case-g
+CASES ?= case-x
 RUNS ?= 10
 BENCHMARK_LOG = benchmark.log
 
@@ -183,4 +190,4 @@ benchmark:
 # Utility
 # ----------------------------------------
 
-.PHONY: build download-model case-a case-b case-c case-d case-e case-f case-g benchmark
+.PHONY: build download-model case-a case-b case-c case-d case-e case-f case-g case-x benchmark
